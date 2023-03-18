@@ -34,6 +34,7 @@ fn main() {
         .init_resource::<EdgeDetectionConfig>()
         .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_startup_system(setup_camera)
+        .add_startup_system(setup_ui)
         .add_startup_system(spawn_cornell_box)
         .add_startup_system(spawn_boxes)
         .add_startup_system(set_unlit.in_base_set(StartupSet::PostStartup))
@@ -42,8 +43,7 @@ fn main() {
         .run();
 }
 
-fn setup_camera(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // set up camera
+fn setup_camera(mut commands: Commands) {
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_xyz(0.0, 2.5, -8.75)
@@ -58,8 +58,9 @@ fn setup_camera(mut commands: Commands, asset_server: Res<AssetServer>) {
             edge_threshold_min: Sensitivity::Extreme,
         },
     ));
+}
 
-    // set up ui
+fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     let font = asset_server.load("FiraMono-Medium.ttf");
     let style = TextStyle {
         font,
