@@ -2,6 +2,9 @@
 name = "bevy_mod_edge_detection"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A simple plugin to add an edge detection shader to bevy"
+repository = "https://github.com/IceSentry/bevy_mod_edge_detection"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
