@@ -1,5 +1,4 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader
-// #import bevy_pbr::utils
 
 struct View {
     view_proj: mat4x4<f32>,
@@ -18,8 +17,8 @@ struct Config {
     normal_threshold: f32,
     color_threshold: f32,
     edge_color: vec4<f32>,
-    debug: f32,
-    enabled: f32,
+    debug: u32,
+    enabled: u32,
 };
 
 @group(0) @binding(0)
@@ -115,13 +114,6 @@ fn detect_edge_depth(frag_coord: vec2<f32>) -> f32 {
     }
 
     var edge = sqrt(dot(horizontal, horizontal) + dot(vertical, vertical));
-    // let power = 1.0;
-    // let N = prepass_normal(uv);
-    // var fresnel = dot(N, view.world_position -);
-    // fresnel = saturate(fresnel);
-    // let fresnel = pow(1.0 - saturate(dot(N, view.view)), power);
-    // let grazingAngleMask = saturate((fresnel + _GrazingAngleMaskPower - 1) / _GrazingAngleMaskPower);
-    // let threshold = edge_depth_threshold* (1 + smoothstep(0, 1 - _GrazingAngleMaskHardness, grazingAngleMask));
     if edge < edge_depth_threshold {
         return 0.0;
     }
@@ -179,27 +171,24 @@ fn detect_edge_color(uv: vec2<f32>, resolution: vec2<f32>) -> f32 {
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let resolution = vec2<f32>(textureDimensions(screen_texture));
     let frag_coord = in.position.xy;
-    let inverse_screen_size = 1.0 / resolution.xy;
-    let uv = frag_coord * inverse_screen_size;
 
-    let color = textureSample(screen_texture, texture_sampler, uv);
+    let color = textureSample(screen_texture, texture_sampler, in.uv);
 
-    if config.enabled == 1.0 {
+    if config.enabled == 1u {
         let edge_depth = detect_edge_depth(frag_coord);
         let edge_normal = detect_edge_normal(frag_coord);
-        let edge_color = detect_edge_color(uv, resolution);
+        let edge_color = detect_edge_color(in.uv, resolution);
         let edge = max(edge_depth, max(edge_normal, edge_color));
 
-        if config.debug == 1.0 {
+        if config.debug == 1u {
             return vec4(edge_depth, edge_normal, edge_color, 1.0);
-        } else {
-            if edge > 0.01 {
-                return config.edge_color;
-            } else {
-                return color;
-            }
         }
-    } else {
-        return color;
+
+        if edge > 0.01 {
+            return config.edge_color;
+        }
     }
+
+    return color;
+
 }

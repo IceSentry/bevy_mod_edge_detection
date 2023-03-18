@@ -207,11 +207,11 @@ fn change_text_system(time: Res<Time>, diagnostics: Res<Diagnostics>, mut query:
 
 fn update_config(mut config: ResMut<EdgeDetectionConfig>, key_input: Res<Input<KeyCode>>) {
     if key_input.just_pressed(KeyCode::X) {
-        config.debug = (config.debug + 1.0) % 2.0;
-        println!("debug: {:?}", config.debug != 0.0);
+        config.debug = (config.debug + 1) % 2;
+        println!("debug: {:?}", config.debug != 0);
     }
     if key_input.just_pressed(KeyCode::C) {
-        config.enabled = (config.enabled + 1.0) % 2.0;
-        println!("enabled: {:?}", config.enabled != 0.0);
+        config.enabled = (config.enabled + 1) % 2;
+        println!("enabled: {:?}", config.enabled != 0);
     }
 }
