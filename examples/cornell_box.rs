@@ -5,7 +5,7 @@ use bevy::{
         fxaa::{Fxaa, Sensitivity},
         prepass::{DepthPrepass, NormalPrepass},
     },
-    diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
+    diagnostic::{Diagnostic, Diagnostics, FrameTimeDiagnosticsPlugin},
     math::vec3,
     prelude::*,
     window::{PresentMode, WindowResolution},
@@ -37,12 +37,13 @@ fn main() {
         .add_startup_system(spawn_cornell_box)
         .add_startup_system(spawn_boxes)
         .add_startup_system(set_unlit.in_base_set(StartupSet::PostStartup))
-        .add_system(change_text_system)
+        .add_system(update_diagnostic_display)
         .add_system(update_config)
         .run();
 }
 
 fn setup_camera(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // set up camera
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_xyz(0.0, 2.5, -8.75)
@@ -57,6 +58,8 @@ fn setup_camera(mut commands: Commands, asset_server: Res<AssetServer>) {
             edge_threshold_min: Sensitivity::Extreme,
         },
     ));
+
+    // set up ui
     let font = asset_server.load("FiraMono-Medium.ttf");
     let style = TextStyle {
         font,
@@ -92,13 +95,7 @@ fn spawn_cornell_box(
 ) {
     let white = materials.add(Color::WHITE.into());
     let plane_size = 5.0;
-    let plane = meshes.add(
-        shape::Plane {
-            size: plane_size,
-            subdivisions: 1,
-        }
-        .into(),
-    );
+    let plane = meshes.add(shape::Plane::from_size(plane_size).into());
 
     // bottom
     commands.spawn(PbrBundle {
@@ -177,31 +174,32 @@ fn spawn_boxes(
     });
 }
 
-fn set_unlit(q: Query<&Handle<StandardMaterial>>, mut materials: ResMut<Assets<StandardMaterial>>) {
-    for id in &q {
-        materials.get_mut(id).unwrap().unlit = true;
+fn set_unlit(
+    material_handles: Query<&Handle<StandardMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for id in &material_handles {
+        if let Some(material) = materials.get_mut(id) {
+            material.unlit = true;
+        }
     }
 }
 
-fn change_text_system(time: Res<Time>, diagnostics: Res<Diagnostics>, mut query: Query<&mut Text>) {
+fn update_diagnostic_display(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text>) {
     for mut text in &mut query {
-        let mut fps = 0.0;
-        if let Some(fps_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
-            if let Some(fps_smoothed) = fps_diagnostic.smoothed() {
-                fps = fps_smoothed;
-            }
-        }
-
-        let mut frame_time = time.delta_seconds_f64();
-        if let Some(frame_time_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FRAME_TIME)
+        if let Some(fps_smoothed) = diagnostics
+            .get(FrameTimeDiagnosticsPlugin::FPS)
+            .and_then(Diagnostic::smoothed)
         {
-            if let Some(frame_time_smoothed) = frame_time_diagnostic.smoothed() {
-                frame_time = frame_time_smoothed;
-            }
+            text.sections[0].value = format!("{fps_smoothed:.1}");
         }
 
-        text.sections[0].value = format!("{fps:.1}");
-        text.sections[2].value = format!("{frame_time:.3}");
+        if let Some(frame_time_smoothed) = diagnostics
+            .get(FrameTimeDiagnosticsPlugin::FRAME_TIME)
+            .and_then(Diagnostic::smoothed)
+        {
+            text.sections[2].value = format!("{frame_time_smoothed:.3}");
+        }
     }
 }
 
