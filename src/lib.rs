@@ -1,6 +1,8 @@
 use bevy::{
+    asset::load_internal_asset,
     core_pipeline::{core_3d, fullscreen_vertex_shader::fullscreen_shader_vertex_state},
     prelude::*,
+    reflect::TypeUuid,
     render::{
         render_graph::RenderGraph,
         render_resource::{
@@ -19,9 +21,14 @@ use node::EdgeDetectionNode;
 
 mod node;
 
+pub const SHADER_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 410592619790336);
+
 pub struct EdgeDetectionPlugin;
 impl Plugin for EdgeDetectionPlugin {
     fn build(&self, app: &mut App) {
+        load_internal_asset!(app, SHADER_HANDLE, "edge_detection.wgsl", Shader::from_wgsl);
+
         let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
@@ -188,8 +195,6 @@ impl FromWorld for EdgeDetectionPipeline {
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
-        let shader = world.resource::<AssetServer>().load("edge_detection.wgsl");
-
         let pipeline_id =
             world
                 .resource_mut::<PipelineCache>()
@@ -199,7 +204,7 @@ impl FromWorld for EdgeDetectionPipeline {
                     // This will setup a fullscreen triangle for the vertex state
                     vertex: fullscreen_shader_vertex_state(),
                     fragment: Some(FragmentState {
-                        shader,
+                        shader: SHADER_HANDLE.typed(),
                         shader_defs: vec![],
                         entry_point: "fragment".into(),
                         targets: vec![Some(ColorTargetState {
