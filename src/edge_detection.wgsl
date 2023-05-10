@@ -56,7 +56,6 @@ fn prepass_normal(frag_coord: vec2<f32>) -> vec3<f32> {
     return world_normal;
 }
 
-
 var<private> sobel_x: array<f32, 9> = array<f32, 9>(
     1.0,
     0.0,
@@ -68,6 +67,7 @@ var<private> sobel_x: array<f32, 9> = array<f32, 9>(
     0.0,
     -1.0,
 );
+
 var<private> sobel_y: array<f32, 9> = array<f32, 9>(
     1.0,
     2.0,
@@ -79,10 +79,6 @@ var<private> sobel_y: array<f32, 9> = array<f32, 9>(
     -2.0,
     -1.0,
 );
-
-var<private> edge_depth_threshold: f32 = 0.1;
-var<private> edge_normal_threshold: f32 = 0.05;
-var<private> edge_color_threshold: f32 = 0.2;
 
 var<private> neighbours: array<vec2<f32>, 9> = array<vec2<f32>, 9>(
     vec2<f32>(-1.0, 1.0),  // 0. top left
@@ -114,7 +110,7 @@ fn detect_edge_depth(frag_coord: vec2<f32>) -> f32 {
     }
 
     var edge = sqrt(dot(horizontal, horizontal) + dot(vertical, vertical));
-    if edge < edge_depth_threshold {
+    if edge < config.depth_threshold {
         return 0.0;
     }
     return edge;
@@ -137,7 +133,7 @@ fn detect_edge_normal(frag_coord: vec2<f32>) -> f32 {
     }
 
     var edge = sqrt(dot(horizontal, horizontal) + dot(vertical, vertical));
-    if edge < edge_normal_threshold {
+    if edge < config.normal_threshold {
         return 0.0;
     }
     return edge;
@@ -161,7 +157,7 @@ fn detect_edge_color(uv: vec2<f32>, resolution: vec2<f32>) -> f32 {
     }
 
     var edge = sqrt(dot(horizontal, horizontal) + dot(vertical, vertical));
-    if edge < edge_color_threshold {
+    if edge < config.color_threshold {
         return 0.0;
     }
     return edge;
@@ -190,5 +186,4 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     }
 
     return color;
-
 }
