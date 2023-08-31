@@ -163,6 +163,21 @@ fn detect_edge_color(uv: vec2<f32>, resolution: vec2<f32>) -> f32 {
     return edge;
 }
 
+// Small experiment with eye dome lighting
+fn edl(position: vec4<f32>) -> f32 {
+    var log_depth = log2(prepass_depth(position.xy));
+
+    var response = 0.0;
+    response += max(0.0, log_depth - log2(prepass_depth(vec2(position.x + 1.0, position.y))));
+    response += max(0.0, log_depth - log2(prepass_depth(vec2(position.x - 1.0, position.y))));
+    response += max(0.0, log_depth - log2(prepass_depth(vec2(position.x, position.y + 1.0))));
+    response += max(0.0, log_depth - log2(prepass_depth(vec2(position.x, position.y - 1.0))));
+    response /= 4.0;
+
+    var shade = exp(-response * 300.0);
+    return shade;
+}
+
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let resolution = vec2<f32>(textureDimensions(screen_texture));
