@@ -1,11 +1,15 @@
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::{
+    f32::consts::{FRAC_PI_2, PI},
+    time::Duration,
+};
 
 use bevy::{
+    asset::ChangeWatcher,
     core_pipeline::{
         fxaa::{Fxaa, Sensitivity},
         prepass::{DepthPrepass, NormalPrepass},
     },
-    diagnostic::{Diagnostic, Diagnostics, FrameTimeDiagnosticsPlugin},
+    diagnostic::{Diagnostic, DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     math::vec3,
     prelude::*,
     window::{PresentMode, WindowResolution},
@@ -15,10 +19,10 @@ use bevy_mod_edge_detection::{EdgeDetectionConfig, EdgeDetectionPlugin};
 fn main() {
     App::new()
         .insert_resource(Msaa::Off)
-        .add_plugins(
+        .add_plugins((
             DefaultPlugins
                 .set(AssetPlugin {
-                    watch_for_changes: true,
+                    watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(250)),
                     ..default()
                 })
                 .set(WindowPlugin {
@@ -29,17 +33,16 @@ fn main() {
                     }),
                     ..default()
                 }),
-        )
-        .add_plugin(EdgeDetectionPlugin)
+            FrameTimeDiagnosticsPlugin,
+            EdgeDetectionPlugin,
+        ))
         .init_resource::<EdgeDetectionConfig>()
-        .add_plugin(FrameTimeDiagnosticsPlugin)
-        .add_startup_system(setup_camera)
-        .add_startup_system(setup_ui)
-        .add_startup_system(spawn_cornell_box)
-        .add_startup_system(spawn_boxes)
-        .add_startup_system(set_unlit.in_base_set(StartupSet::PostStartup))
-        .add_system(update_diagnostic_display)
-        .add_system(update_config)
+        .add_systems(
+            Startup,
+            (setup_camera, setup_ui, spawn_cornell_box, spawn_boxes),
+        )
+        .add_systems(PostStartup, set_unlit)
+        .add_systems(Update, (update_diagnostic_display, update_config))
         .run();
 }
 
@@ -60,12 +63,11 @@ fn setup_camera(mut commands: Commands) {
     ));
 }
 
-fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let font = asset_server.load("FiraMono-Medium.ttf");
+fn setup_ui(mut commands: Commands) {
     let style = TextStyle {
-        font,
         font_size: 16.0,
         color: Color::WHITE,
+        ..default()
     };
     commands
         .spawn(
@@ -77,12 +79,8 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             ])
             .with_style(Style {
                 position_type: PositionType::Absolute,
-                position: UiRect {
-                    top: Val::Px(5.0),
-                    left: Val::Px(5.0),
-                    ..default()
-                },
-
+                top: Val::Px(5.0),
+                left: Val::Px(5.0),
                 ..default()
             }),
         )
@@ -186,7 +184,7 @@ fn set_unlit(
     }
 }
 
-fn update_diagnostic_display(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text>) {
+fn update_diagnostic_display(diagnostics: Res<DiagnosticsStore>, mut query: Query<&mut Text>) {
     for mut text in &mut query {
         if let Some(fps_smoothed) = diagnostics
             .get(FrameTimeDiagnosticsPlugin::FPS)

@@ -1,25 +1,33 @@
 use bevy::{
     asset::load_internal_asset,
-    core_pipeline::{core_3d, fullscreen_vertex_shader::fullscreen_shader_vertex_state},
+    core_pipeline::{
+        core_3d::{self, CORE_3D},
+        fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+    },
     prelude::*,
     reflect::TypeUuid,
     render::{
-        render_graph::RenderGraph,
+        render_graph::{RenderGraphApp, ViewNodeRunner},
         render_resource::{
-            BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-            BufferBindingType, CachedRenderPipelineId, ColorTargetState, ColorWrites,
-            FragmentState, MultisampleState, PipelineCache, PrimitiveState,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            ShaderType, TextureFormat, TextureSampleType, TextureViewDimension, UniformBuffer,
+            BindGroupLayout, BindingType, BufferBindingType, CachedRenderPipelineId,
+            ColorTargetState, ColorWrites, FragmentState, MultisampleState, PipelineCache,
+            PrimitiveState, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+            SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType,
+            TextureViewDimension, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::BevyDefault,
-        Extract, RenderApp, RenderSet,
+        Extract, Render, RenderApp, RenderSet,
     },
 };
 use node::EdgeDetectionNode;
+use render_ext::{
+    bind_group_layout_types::{sampler, texture_2d, texture_depth_2d, uniform_buffer},
+    RenderDeviceExt,
+};
 
 mod node;
+mod render_ext;
 
 pub const SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 410592619790336);
@@ -34,26 +42,27 @@ impl Plugin for EdgeDetectionPlugin {
         };
 
         render_app
+            .add_systems(ExtractSchedule, extract_config)
+            .add_systems(Render, prepare_config_buffer.in_set(RenderSet::Prepare));
+
+        use core_3d::graph::node::*;
+        render_app
+            .add_render_graph_node::<ViewNodeRunner<EdgeDetectionNode>>(
+                CORE_3D,
+                EdgeDetectionNode::NAME,
+            )
+            .add_render_graph_edges(
+                CORE_3D,
+                &[END_MAIN_PASS, EdgeDetectionNode::NAME, TONEMAPPING],
+            );
+    }
+    fn finish(&self, app: &mut App) {
+        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+        render_app
             .init_resource::<EdgeDetectionPipeline>()
-            .init_resource::<ConfigBuffer>()
-            .add_system(extract_config.in_schedule(ExtractSchedule))
-            .add_system(prepare_config_buffer.in_set(RenderSet::Prepare));
-
-        let node = EdgeDetectionNode::new(&mut render_app.world);
-
-        let mut graph = render_app.world.resource_mut::<RenderGraph>();
-        let core_3d_graph = graph.get_sub_graph_mut(core_3d::graph::NAME).unwrap();
-        core_3d_graph.add_node(EdgeDetectionNode::NAME, node);
-
-        core_3d_graph.add_slot_edge(
-            core_3d_graph.input_node().id,
-            core_3d::graph::input::VIEW_ENTITY,
-            EdgeDetectionNode::NAME,
-            EdgeDetectionNode::IN_VIEW,
-        );
-
-        core_3d_graph.add_node_edge(core_3d::graph::node::MAIN_PASS, EdgeDetectionNode::NAME);
-        core_3d_graph.add_node_edge(EdgeDetectionNode::NAME, core_3d::graph::node::TONEMAPPING);
+            .init_resource::<ConfigBuffer>();
     }
 }
 
@@ -127,71 +136,23 @@ impl FromWorld for EdgeDetectionPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
-        let layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("edge_detection_bind_group_layout"),
-            entries: &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // Depth
-                BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Depth,
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // Normals
-                BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // View
-                BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // Config
-                BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
+        let layout = render_device.create_bind_group_layout_ext(
+            "edge_detection_bind_group_layout",
+            ShaderStages::FRAGMENT,
+            [
+                // screen_texture
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                sampler(SamplerBindingType::Filtering),
+                // depth prepass
+                texture_2d(TextureSampleType::Depth),
+                // normal prepass
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                // view
+                uniform_buffer(false, None),
+                // config
+                uniform_buffer(false, None),
             ],
-        });
+        );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 

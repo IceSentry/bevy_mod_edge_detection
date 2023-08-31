@@ -2,115 +2,60 @@ use bevy::{
     core_pipeline::prepass::ViewPrepassTextures,
     prelude::*,
     render::{
-        render_graph::{Node, NodeRunError, RenderGraphContext, SlotInfo, SlotType},
+        render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_resource::{
-            BindGroupDescriptor, BindGroupEntry, BindingResource, Operations, PipelineCache,
-            RenderPassColorAttachment, RenderPassDescriptor,
+            Operations, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
         },
         renderer::RenderContext,
-        view::{ExtractedView, ViewTarget, ViewUniforms},
+        view::{ViewTarget, ViewUniforms},
     },
 };
 
-use crate::{ConfigBuffer, EdgeDetectionPipeline};
+use crate::{
+    render_ext::{BindingResouceExt, RenderDeviceExt},
+    ConfigBuffer, EdgeDetectionPipeline,
+};
 
-pub struct EdgeDetectionNode {
-    query: QueryState<(&'static ViewTarget, &'static ViewPrepassTextures), With<ExtractedView>>,
-}
-
+#[derive(Default)]
+pub struct EdgeDetectionNode;
 impl EdgeDetectionNode {
-    pub const IN_VIEW: &str = "view";
-    pub const NAME: &str = "edge_detection";
-
-    pub fn new(world: &mut World) -> Self {
-        Self {
-            query: QueryState::new(world),
-        }
-    }
+    pub const NAME: &str = "edge_detection_node";
 }
 
-impl Node for EdgeDetectionNode {
-    fn input(&self) -> Vec<SlotInfo> {
-        vec![SlotInfo::new(EdgeDetectionNode::IN_VIEW, SlotType::Entity)]
-    }
-
-    fn update(&mut self, world: &mut World) {
-        self.query.update_archetypes(world);
-    }
+impl ViewNode for EdgeDetectionNode {
+    type ViewQuery = (&'static ViewTarget, &'static ViewPrepassTextures);
 
     fn run(
         &self,
-        graph_context: &mut RenderGraphContext,
+        _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext,
+        (view_target, prepass_textures): bevy::ecs::query::QueryItem<Self::ViewQuery>,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let view_entity = graph_context.get_input_entity(EdgeDetectionNode::IN_VIEW)?;
-
-        let Ok((view_target, prepass_textures)) = self.query.get_manual(world, view_entity) else {
-            return Ok(());
-        };
-
-        let post_process_pipeline = world.resource::<EdgeDetectionPipeline>();
+        let edge_detection_pipeline = world.resource::<EdgeDetectionPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
-
-        let Some(pipeline) = pipeline_cache.get_render_pipeline(post_process_pipeline.pipeline_id) else {
+        let Some(pipeline) =
+            pipeline_cache.get_render_pipeline(edge_detection_pipeline.pipeline_id)
+        else {
             return Ok(());
         };
 
         let post_process = view_target.post_process_write();
-
         let view_uniforms = world.resource::<ViewUniforms>();
-
-        let Some(view_binding) = view_uniforms.uniforms.binding() else {
-            return Ok(());
-        };
-
         let config_buffer = world.resource::<ConfigBuffer>();
 
-        let bind_group_descriptor = BindGroupDescriptor {
-            label: Some("edge_detection_bind_group"),
-            layout: &post_process_pipeline.layout,
-            entries: &[
-                // screen texture
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(post_process.source),
-                },
-                // sampler
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::Sampler(&post_process_pipeline.sampler),
-                },
-                // depth
-                BindGroupEntry {
-                    binding: 2,
-                    resource: BindingResource::TextureView(
-                        &prepass_textures.depth.as_ref().unwrap().default_view,
-                    ),
-                },
-                // normal
-                BindGroupEntry {
-                    binding: 3,
-                    resource: BindingResource::TextureView(
-                        &prepass_textures.normal.as_ref().unwrap().default_view,
-                    ),
-                },
-                // view
-                BindGroupEntry {
-                    binding: 4,
-                    resource: view_binding.clone(),
-                },
-                // config
-                BindGroupEntry {
-                    binding: 5,
-                    resource: config_buffer.buffer.binding().unwrap().clone(),
-                },
+        let bind_group = render_context.render_device().create_bind_group_ext(
+            "edge_detection_bind_group",
+            &edge_detection_pipeline.layout,
+            [
+                post_process.source.bind(),
+                edge_detection_pipeline.sampler.bind(),
+                prepass_textures.depth.bind(),
+                prepass_textures.normal.bind(),
+                view_uniforms.uniforms.bind(),
+                config_buffer.buffer.bind(),
             ],
-        };
-
-        let bind_group = render_context
-            .render_device()
-            .create_bind_group(&bind_group_descriptor);
+        );
 
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
             label: Some("edge_detection_pass"),

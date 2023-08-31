@@ -11,10 +11,9 @@ fn main() {
     App::new()
         // MSAA currently doesn't work correctly with the plugin
         .insert_resource(Msaa::Off)
-        .add_plugins(DefaultPlugins)
-        .add_plugin(EdgeDetectionPlugin)
+        .add_plugins((DefaultPlugins, EdgeDetectionPlugin))
         .init_resource::<EdgeDetectionConfig>()
-        .add_startup_system(setup)
+        .add_systems(Startup, setup)
         .run();
 }
 

@@ -1,4 +1,4 @@
-#import bevy_core_pipeline::fullscreen_vertex_shader
+#import bevy_core_pipeline::fullscreen_vertex_shader FullscreenVertexOutput
 
 struct View {
     view_proj: mat4x4<f32>,
