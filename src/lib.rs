@@ -9,11 +9,10 @@ use bevy::{
     render::{
         render_graph::{RenderGraphApp, ViewNodeRunner},
         render_resource::{
-            BindGroupLayout, BindingType, BufferBindingType, CachedRenderPipelineId,
-            ColorTargetState, ColorWrites, FragmentState, MultisampleState, PipelineCache,
-            PrimitiveState, RenderPipelineDescriptor, Sampler, SamplerBindingType,
-            SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType,
-            TextureViewDimension, UniformBuffer,
+            BindGroupLayout, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
+            MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor, Sampler,
+            SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, TextureFormat,
+            TextureSampleType, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::BevyDefault,
@@ -144,7 +143,7 @@ impl FromWorld for EdgeDetectionPipeline {
                 texture_2d(TextureSampleType::Float { filterable: true }),
                 sampler(SamplerBindingType::Filtering),
                 // depth prepass
-                texture_2d(TextureSampleType::Depth),
+                texture_depth_2d(),
                 // normal prepass
                 texture_2d(TextureSampleType::Float { filterable: true }),
                 // view
