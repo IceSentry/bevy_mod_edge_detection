@@ -25,6 +25,7 @@ use render_ext::{
     RenderDeviceExt,
 };
 
+mod bind_group_entries;
 mod node;
 mod render_ext;
 

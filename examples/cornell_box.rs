@@ -36,13 +36,21 @@ fn main() {
             FrameTimeDiagnosticsPlugin,
             EdgeDetectionPlugin,
         ))
-        .init_resource::<EdgeDetectionConfig>()
+        .insert_resource(EdgeDetectionConfig {
+            depth_threshold: 1.0,
+            normal_threshold: 1.0,
+            color_threshold: 1.0,
+            ..default()
+        })
         .add_systems(
             Startup,
             (setup_camera, setup_ui, spawn_cornell_box, spawn_boxes),
         )
         .add_systems(PostStartup, set_unlit)
-        .add_systems(Update, (update_diagnostic_display, update_config))
+        .add_systems(
+            Update,
+            (update_diagnostic_display, update_config, update_camera),
+        )
         .run();
 }
 
@@ -210,5 +218,20 @@ fn update_config(mut config: ResMut<EdgeDetectionConfig>, key_input: Res<Input<K
     if key_input.just_pressed(KeyCode::C) {
         config.enabled = (config.enabled + 1) % 2;
         println!("enabled: {:?}", config.enabled != 0);
+    }
+}
+
+fn update_camera(
+    key_input: Res<Input<KeyCode>>,
+    mut cam: Query<&mut Transform, With<Camera3d>>,
+    time: Res<Time>,
+) {
+    for mut t in &mut cam {
+        if key_input.pressed(KeyCode::S) {
+            t.translation.z -= 10.0 * time.delta_seconds();
+        }
+        if key_input.pressed(KeyCode::W) {
+            t.translation.z += 10.0 * time.delta_seconds();
+        }
     }
 }
