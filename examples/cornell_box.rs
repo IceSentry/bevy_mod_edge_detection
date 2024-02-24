@@ -37,9 +37,10 @@ fn main() {
             EdgeDetectionPlugin,
         ))
         .insert_resource(EdgeDetectionConfig {
-            depth_threshold: 1.0,
+            depth_threshold: 0.0,
             normal_threshold: 1.0,
-            color_threshold: 1.0,
+            color_threshold: 0.0,
+            debug: 0,
             ..default()
         })
         .add_systems(
@@ -226,12 +227,19 @@ fn update_camera(
     mut cam: Query<&mut Transform, With<Camera3d>>,
     time: Res<Time>,
 ) {
+    let speed = 10.0;
     for mut t in &mut cam {
         if key_input.pressed(KeyCode::S) {
-            t.translation.z -= 10.0 * time.delta_seconds();
+            t.translation.z -= speed * time.delta_seconds();
         }
         if key_input.pressed(KeyCode::W) {
-            t.translation.z += 10.0 * time.delta_seconds();
+            t.translation.z += speed * time.delta_seconds();
+        }
+        if key_input.pressed(KeyCode::D) {
+            t.translation.x -= speed * time.delta_seconds();
+        }
+        if key_input.pressed(KeyCode::A) {
+            t.translation.x += speed * time.delta_seconds();
         }
     }
 }

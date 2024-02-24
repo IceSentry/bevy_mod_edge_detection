@@ -90,7 +90,7 @@ impl RenderDeviceExt for RenderDevice {
             .map(|(i, entry)| BindGroupLayoutEntry {
                 binding: i as u32,
                 visibility: entry.override_vis.unwrap_or(default_visibility),
-                ty: entry.raw.ty,
+                ty: entry.ty,
                 count: None,
             })
             .collect::<Vec<_>>();
@@ -214,9 +214,9 @@ impl BindingResouceExt for Option<CachedTexture> {
     }
 }
 
-struct BindGroupLayoutEntryWrapper {
-    override_vis: Option<ShaderStages>,
-    ty: BindingType,
+pub struct BindGroupLayoutEntryWrapper {
+    pub override_vis: Option<ShaderStages>,
+    pub ty: BindingType,
 }
 
 impl BindGroupLayoutEntryWrapper {
@@ -233,19 +233,6 @@ impl BindGroupLayoutEntryWrapper {
     }
 }
 
-fn temp(render_device: RenderDevice) {
-    use bind_group_layout_types2::*;
-    render_device.create_bind_group_layout_ext2(
-        "label",
-        ShaderStages::FRAGMENT,
-        [
-            storage_buffer(false, None),
-            texture_2d(TextureSampleType::Float { filterable: true })
-                .visibility(ShaderStages::VERTEX_FRAGMENT),
-            texture_2d_multisampled(TextureSampleType::Float { filterable: true }),
-        ],
-    );
-}
 pub mod bind_group_layout_types2 {
     use std::num::NonZeroU64;
 

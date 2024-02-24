@@ -4,10 +4,11 @@ use bevy::{
     render::{
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_resource::{
-            Operations, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
+            BindGroupEntry, Operations, PipelineCache, RenderPassColorAttachment,
+            RenderPassDescriptor,
         },
         renderer::RenderContext,
-        view::{ViewTarget, ViewUniforms},
+        view::{ViewTarget, ViewUniformOffset, ViewUniforms},
     },
 };
 
@@ -23,13 +24,17 @@ impl EdgeDetectionNode {
 }
 
 impl ViewNode for EdgeDetectionNode {
-    type ViewQuery = (&'static ViewTarget, &'static ViewPrepassTextures);
+    type ViewQuery = (
+        &'static ViewTarget,
+        &'static ViewPrepassTextures,
+        &'static ViewUniformOffset,
+    );
 
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext,
-        (view_target, prepass_textures): bevy::ecs::query::QueryItem<Self::ViewQuery>,
+        (view_target, prepass_textures, view_uniform): bevy::ecs::query::QueryItem<Self::ViewQuery>,
         world: &World,
     ) -> Result<(), NodeRunError> {
         let edge_detection_pipeline = world.resource::<EdgeDetectionPipeline>();
@@ -44,6 +49,10 @@ impl ViewNode for EdgeDetectionNode {
         let view_uniforms = world.resource::<ViewUniforms>();
         let config_buffer = world.resource::<ConfigBuffer>();
 
+        let Some(view_uniforms) = view_uniforms.uniforms.binding() else {
+            return Ok(());
+        };
+
         let bind_group = render_context.render_device().create_bind_group_ext(
             "edge_detection_bind_group",
             &edge_detection_pipeline.layout,
@@ -52,7 +61,10 @@ impl ViewNode for EdgeDetectionNode {
                 edge_detection_pipeline.sampler.bind(),
                 prepass_textures.depth.bind(),
                 prepass_textures.normal.bind(),
-                view_uniforms.uniforms.bind(),
+                BindGroupEntry {
+                    binding: u32::MAX,
+                    resource: view_uniforms,
+                },
                 config_buffer.buffer.bind(),
             ],
         );
@@ -68,7 +80,7 @@ impl ViewNode for EdgeDetectionNode {
         });
 
         render_pass.set_render_pipeline(pipeline);
-        render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.set_bind_group(0, &bind_group, &[view_uniform.offset]);
         render_pass.draw(0..3, 0..1);
 
         Ok(())

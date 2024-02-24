@@ -16,6 +16,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         texture::BevyDefault,
+        view::ViewUniform,
         Extract, Render, RenderApp, RenderSet,
     },
 };
@@ -25,7 +26,6 @@ use render_ext::{
     RenderDeviceExt,
 };
 
-mod bind_group_entries;
 mod node;
 mod render_ext;
 
@@ -36,6 +36,7 @@ pub struct EdgeDetectionPlugin;
 impl Plugin for EdgeDetectionPlugin {
     fn build(&self, app: &mut App) {
         load_internal_asset!(app, SHADER_HANDLE, "edge_detection.wgsl", Shader::from_wgsl);
+        // app.add_systems(Update, print_projection);
 
         let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
@@ -148,7 +149,7 @@ impl FromWorld for EdgeDetectionPipeline {
                 // normal prepass
                 texture_2d(TextureSampleType::Float { filterable: true }),
                 // view
-                uniform_buffer(false, None),
+                uniform_buffer(true, Some(ViewUniform::min_size())),
                 // config
                 uniform_buffer(false, None),
             ],
@@ -166,7 +167,7 @@ impl FromWorld for EdgeDetectionPipeline {
                     vertex: fullscreen_shader_vertex_state(),
                     fragment: Some(FragmentState {
                         shader: SHADER_HANDLE.typed(),
-                        shader_defs: vec![],
+                        shader_defs: vec!["VIEW_PROJECTION_PERSPECTIVE".into()], // TODO detect projection
                         entry_point: "fragment".into(),
                         targets: vec![Some(ColorTargetState {
                             format: TextureFormat::bevy_default(),
