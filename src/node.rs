@@ -2,9 +2,9 @@ use bevy::{
     core_pipeline::prepass::ViewPrepassTextures,
     prelude::*,
     render::{
-        render_graph::{NodeRunError, RenderGraphContext, ViewNode},
+        render_graph::{NodeRunError, RenderGraphContext, RenderLabel, ViewNode},
         render_resource::{
-            BindGroupEntry, Operations, PipelineCache, RenderPassColorAttachment,
+            BindGroupEntries, Operations, PipelineCache, RenderPassColorAttachment,
             RenderPassDescriptor,
         },
         renderer::RenderContext,
@@ -12,16 +12,13 @@ use bevy::{
     },
 };
 
-use crate::{
-    render_ext::{BindingResouceExt, RenderDeviceExt},
-    ConfigBuffer, EdgeDetectionPipeline,
-};
+use crate::{ConfigBuffer, EdgeDetectionPipeline};
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+pub struct EdgeDetetctionNodeLabel;
 
 #[derive(Default)]
 pub struct EdgeDetectionNode;
-impl EdgeDetectionNode {
-    pub const NAME: &str = "edge_detection_node";
-}
 
 impl ViewNode for EdgeDetectionNode {
     type ViewQuery = (
@@ -53,20 +50,23 @@ impl ViewNode for EdgeDetectionNode {
             return Ok(());
         };
 
-        let bind_group = render_context.render_device().create_bind_group_ext(
+        let (Some(depth_texture), Some(normal_texture)) =
+            (&prepass_textures.depth, &prepass_textures.normal)
+        else {
+            return Ok(());
+        };
+
+        let bind_group = render_context.render_device().create_bind_group(
             "edge_detection_bind_group",
             &edge_detection_pipeline.layout,
-            [
-                post_process.source.bind(),
-                edge_detection_pipeline.sampler.bind(),
-                prepass_textures.depth.bind(),
-                prepass_textures.normal.bind(),
-                BindGroupEntry {
-                    binding: u32::MAX,
-                    resource: view_uniforms,
-                },
-                config_buffer.buffer.bind(),
-            ],
+            &BindGroupEntries::sequential((
+                post_process.source,
+                &edge_detection_pipeline.sampler,
+                &depth_texture.texture.default_view,
+                &normal_texture.texture.default_view,
+                view_uniforms,
+                &config_buffer.buffer,
+            )),
         );
 
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
@@ -77,6 +77,8 @@ impl ViewNode for EdgeDetectionNode {
                 ops: Operations::default(),
             })],
             depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
 
         render_pass.set_render_pipeline(pipeline);

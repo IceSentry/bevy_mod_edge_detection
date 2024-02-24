@@ -1,10 +1,6 @@
-use std::{
-    f32::consts::{FRAC_PI_2, PI},
-    time::Duration,
-};
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    asset::ChangeWatcher,
     core_pipeline::{
         fxaa::{Fxaa, Sensitivity},
         prepass::{DepthPrepass, NormalPrepass},
@@ -20,19 +16,14 @@ fn main() {
     App::new()
         .insert_resource(Msaa::Off)
         .add_plugins((
-            DefaultPlugins
-                .set(AssetPlugin {
-                    watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(250)),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        resolution: WindowResolution::new(720.0, 720.0),
-                        present_mode: PresentMode::AutoNoVsync,
-                        ..default()
-                    }),
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    resolution: WindowResolution::new(720.0, 720.0),
+                    present_mode: PresentMode::AutoNoVsync,
                     ..default()
                 }),
+                ..default()
+            }),
             FrameTimeDiagnosticsPlugin,
             EdgeDetectionPlugin,
         ))
@@ -101,9 +92,9 @@ fn spawn_cornell_box(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let white = materials.add(Color::WHITE.into());
+    let white = materials.add(Color::WHITE);
     let plane_size = 5.0;
-    let plane = meshes.add(shape::Plane::from_size(plane_size).into());
+    let plane = meshes.add(Plane3d::default().mesh().size(plane_size, plane_size));
 
     // bottom
     commands.spawn(PbrBundle {
@@ -130,7 +121,7 @@ fn spawn_cornell_box(
     // left
     commands.spawn(PbrBundle {
         mesh: plane.clone(),
-        material: materials.add(Color::RED.into()),
+        material: materials.add(Color::RED),
         transform: Transform::from_xyz(2.5, 2.5, 0.0)
             .with_rotation(Quat::from_rotation_z(FRAC_PI_2)),
         ..default()
@@ -138,7 +129,7 @@ fn spawn_cornell_box(
     // right
     commands.spawn(PbrBundle {
         mesh: plane,
-        material: materials.add(Color::GREEN.into()),
+        material: materials.add(Color::GREEN),
         transform: Transform::from_xyz(-2.5, 2.5, 0.0)
             .with_rotation(Quat::from_rotation_z(-FRAC_PI_2)),
         ..default()
@@ -166,16 +157,16 @@ fn spawn_boxes(
     let half_box_size = box_size / 2.0;
 
     commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Box::new(box_size, box_size * 2.0, box_size).into()),
-        material: materials.add(Color::WHITE.into()),
+        mesh: meshes.add(Cuboid::new(box_size, box_size * 2.0, box_size)),
+        material: materials.add(Color::WHITE),
         transform: Transform::from_xyz(half_box_size, half_box_size * 2.0, half_box_size)
             .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_6)),
         ..default()
     });
 
     commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Cube { size: box_size }.into()),
-        material: materials.add(Color::WHITE.into()),
+        mesh: meshes.add(Cuboid::new(box_size, box_size, box_size)),
+        material: materials.add(Color::WHITE),
         transform: Transform::from_xyz(-half_box_size, half_box_size, -half_box_size)
             .with_rotation(Quat::from_rotation_y(-std::f32::consts::FRAC_PI_6)),
         ..default()
@@ -196,14 +187,14 @@ fn set_unlit(
 fn update_diagnostic_display(diagnostics: Res<DiagnosticsStore>, mut query: Query<&mut Text>) {
     for mut text in &mut query {
         if let Some(fps_smoothed) = diagnostics
-            .get(FrameTimeDiagnosticsPlugin::FPS)
+            .get(&FrameTimeDiagnosticsPlugin::FPS)
             .and_then(Diagnostic::smoothed)
         {
             text.sections[0].value = format!("{fps_smoothed:.1}");
         }
 
         if let Some(frame_time_smoothed) = diagnostics
-            .get(FrameTimeDiagnosticsPlugin::FRAME_TIME)
+            .get(&FrameTimeDiagnosticsPlugin::FRAME_TIME)
             .and_then(Diagnostic::smoothed)
         {
             text.sections[2].value = format!("{frame_time_smoothed:.3}");
@@ -211,35 +202,41 @@ fn update_diagnostic_display(diagnostics: Res<DiagnosticsStore>, mut query: Quer
     }
 }
 
-fn update_config(mut config: ResMut<EdgeDetectionConfig>, key_input: Res<Input<KeyCode>>) {
-    if key_input.just_pressed(KeyCode::X) {
+fn update_config(mut config: ResMut<EdgeDetectionConfig>, key_input: Res<ButtonInput<KeyCode>>) {
+    if key_input.just_pressed(KeyCode::KeyX) {
         config.debug = (config.debug + 1) % 2;
         println!("debug: {:?}", config.debug != 0);
     }
-    if key_input.just_pressed(KeyCode::C) {
+    if key_input.just_pressed(KeyCode::KeyC) {
         config.enabled = (config.enabled + 1) % 2;
         println!("enabled: {:?}", config.enabled != 0);
     }
 }
 
 fn update_camera(
-    key_input: Res<Input<KeyCode>>,
+    key_input: Res<ButtonInput<KeyCode>>,
     mut cam: Query<&mut Transform, With<Camera3d>>,
     time: Res<Time>,
 ) {
     let speed = 10.0;
     for mut t in &mut cam {
-        if key_input.pressed(KeyCode::S) {
+        if key_input.pressed(KeyCode::KeyS) {
             t.translation.z -= speed * time.delta_seconds();
         }
-        if key_input.pressed(KeyCode::W) {
+        if key_input.pressed(KeyCode::KeyW) {
             t.translation.z += speed * time.delta_seconds();
         }
-        if key_input.pressed(KeyCode::D) {
+        if key_input.pressed(KeyCode::KeyD) {
             t.translation.x -= speed * time.delta_seconds();
         }
-        if key_input.pressed(KeyCode::A) {
+        if key_input.pressed(KeyCode::KeyA) {
             t.translation.x += speed * time.delta_seconds();
+        }
+        if key_input.pressed(KeyCode::KeyQ) {
+            t.translation.y -= speed * time.delta_seconds();
+        }
+        if key_input.pressed(KeyCode::KeyE) {
+            t.translation.y += speed * time.delta_seconds();
         }
     }
 }

@@ -1,18 +1,20 @@
 use bevy::{
     asset::load_internal_asset,
     core_pipeline::{
-        core_3d::{self, CORE_3D},
+        core_3d::graph::{Core3d, Node3d},
         fullscreen_vertex_shader::fullscreen_shader_vertex_state,
     },
     prelude::*,
-    reflect::TypeUuid,
     render::{
         render_graph::{RenderGraphApp, ViewNodeRunner},
         render_resource::{
-            BindGroupLayout, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
-            MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor, Sampler,
-            SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, TextureFormat,
-            TextureSampleType, UniformBuffer,
+            binding_types::{
+                sampler, texture_2d, texture_depth_2d, uniform_buffer, uniform_buffer_sized,
+            },
+            BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
+            ColorWrites, FragmentState, MultisampleState, PipelineCache, PrimitiveState,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            ShaderType, TextureFormat, TextureSampleType, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::BevyDefault,
@@ -21,16 +23,12 @@ use bevy::{
     },
 };
 use node::EdgeDetectionNode;
-use render_ext::{
-    bind_group_layout_types::{sampler, texture_2d, texture_depth_2d, uniform_buffer},
-    RenderDeviceExt,
-};
+
+use crate::node::EdgeDetetctionNodeLabel;
 
 mod node;
-mod render_ext;
 
-pub const SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 410592619790336);
+pub const SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(410592619790336);
 
 pub struct EdgeDetectionPlugin;
 impl Plugin for EdgeDetectionPlugin {
@@ -46,15 +44,18 @@ impl Plugin for EdgeDetectionPlugin {
             .add_systems(ExtractSchedule, extract_config)
             .add_systems(Render, prepare_config_buffer.in_set(RenderSet::Prepare));
 
-        use core_3d::graph::node::*;
         render_app
             .add_render_graph_node::<ViewNodeRunner<EdgeDetectionNode>>(
-                CORE_3D,
-                EdgeDetectionNode::NAME,
+                Core3d,
+                EdgeDetetctionNodeLabel,
             )
             .add_render_graph_edges(
-                CORE_3D,
-                &[END_MAIN_PASS, EdgeDetectionNode::NAME, TONEMAPPING],
+                Core3d,
+                (
+                    Node3d::EndMainPass,
+                    EdgeDetetctionNodeLabel,
+                    Node3d::Tonemapping,
+                ),
             );
     }
     fn finish(&self, app: &mut App) {
@@ -137,22 +138,24 @@ impl FromWorld for EdgeDetectionPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
-        let layout = render_device.create_bind_group_layout_ext(
+        let layout = render_device.create_bind_group_layout(
             "edge_detection_bind_group_layout",
-            ShaderStages::FRAGMENT,
-            [
-                // screen_texture
-                texture_2d(TextureSampleType::Float { filterable: true }),
-                sampler(SamplerBindingType::Filtering),
-                // depth prepass
-                texture_depth_2d(),
-                // normal prepass
-                texture_2d(TextureSampleType::Float { filterable: true }),
-                // view
-                uniform_buffer(true, Some(ViewUniform::min_size())),
-                // config
-                uniform_buffer(false, None),
-            ],
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    // screen_texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                    // depth prepass
+                    texture_depth_2d(),
+                    // normal prepass
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    // view
+                    uniform_buffer::<ViewUniform>(true),
+                    // config
+                    uniform_buffer_sized(false, None),
+                ),
+            ),
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
@@ -166,7 +169,7 @@ impl FromWorld for EdgeDetectionPipeline {
                     // This will setup a fullscreen triangle for the vertex state
                     vertex: fullscreen_shader_vertex_state(),
                     fragment: Some(FragmentState {
-                        shader: SHADER_HANDLE.typed(),
+                        shader: SHADER_HANDLE,
                         shader_defs: vec!["VIEW_PROJECTION_PERSPECTIVE".into()], // TODO detect projection
                         entry_point: "fragment".into(),
                         targets: vec![Some(ColorTargetState {
