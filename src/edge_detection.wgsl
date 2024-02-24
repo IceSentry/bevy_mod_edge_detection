@@ -1,5 +1,5 @@
-#import bevy_core_pipeline::fullscreen_vertex_shader FullscreenVertexOutput
-#import bevy_render::view View
+#import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
+#import bevy_render::view::View
 
 struct Config {
     depth_threshold: f32,
