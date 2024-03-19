@@ -6,6 +6,7 @@ use bevy::{
     },
     prelude::*,
     render::{
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
         render_graph::{RenderGraphApp, ViewNodeRunner},
         render_resource::{
             binding_types::{
@@ -35,6 +36,8 @@ impl Plugin for EdgeDetectionPlugin {
     fn build(&self, app: &mut App) {
         load_internal_asset!(app, SHADER_HANDLE, "edge_detection.wgsl", Shader::from_wgsl);
         // app.add_systems(Update, print_projection);
+
+        app.add_plugins(ExtractComponentPlugin::<EdgeDetectionCamera>::default());
 
         let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
@@ -67,6 +70,8 @@ impl Plugin for EdgeDetectionPlugin {
             .init_resource::<ConfigBuffer>();
     }
 }
+#[derive(Component, Clone, Copy, ExtractComponent)]
+pub struct EdgeDetectionCamera;
 
 #[derive(Resource, ShaderType, Clone, Copy)]
 pub struct EdgeDetectionConfig {

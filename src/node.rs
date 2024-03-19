@@ -12,7 +12,7 @@ use bevy::{
     },
 };
 
-use crate::{ConfigBuffer, EdgeDetectionPipeline};
+use crate::{ConfigBuffer, EdgeDetectionCamera, EdgeDetectionPipeline};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub struct EdgeDetetctionNodeLabel;
@@ -25,13 +25,16 @@ impl ViewNode for EdgeDetectionNode {
         &'static ViewTarget,
         &'static ViewPrepassTextures,
         &'static ViewUniformOffset,
+        &'static EdgeDetectionCamera,
     );
 
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext,
-        (view_target, prepass_textures, view_uniform): bevy::ecs::query::QueryItem<Self::ViewQuery>,
+        (view_target, prepass_textures, view_uniform, _): bevy::ecs::query::QueryItem<
+            Self::ViewQuery,
+        >,
         world: &World,
     ) -> Result<(), NodeRunError> {
         let edge_detection_pipeline = world.resource::<EdgeDetectionPipeline>();

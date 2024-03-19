@@ -10,7 +10,7 @@ use bevy::{
     prelude::*,
     window::{PresentMode, WindowResolution},
 };
-use bevy_mod_edge_detection::{EdgeDetectionConfig, EdgeDetectionPlugin};
+use bevy_mod_edge_detection::{EdgeDetectionCamera, EdgeDetectionConfig, EdgeDetectionPlugin};
 
 fn main() {
     App::new()
@@ -60,6 +60,7 @@ fn setup_camera(mut commands: Commands) {
             edge_threshold: Sensitivity::Extreme,
             edge_threshold_min: Sensitivity::Extreme,
         },
+        EdgeDetectionCamera,
     ));
 }
 
