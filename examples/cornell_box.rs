@@ -209,8 +209,8 @@ fn update_config(mut config: ResMut<EdgeDetectionConfig>, key_input: Res<ButtonI
         println!("debug: {:?}", config.debug != 0);
     }
     if key_input.just_pressed(KeyCode::KeyC) {
-        config.enabled = (config.enabled + 1) % 2;
-        println!("enabled: {:?}", config.enabled != 0);
+        config.full_screen_enabled = (config.full_screen_enabled + 1) % 2;
+        println!("enabled: {:?}", config.full_screen_enabled != 0);
     }
 }
 

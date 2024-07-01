@@ -1,13 +1,15 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
+#import bevy_pbr::pbr_deferred_functions::pbr_input_from_deferred_gbuffer
 
 struct Config {
+    thickness: f32,
     depth_threshold: f32,
     normal_threshold: f32,
     color_threshold: f32,
     edge_color: vec4f,
     debug: u32,
-    enabled: u32,
+    full_screen_enabled: u32,
 };
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
@@ -16,6 +18,10 @@ struct Config {
 @group(0) @binding(3) var normal_prepass_texture: texture_2d<f32>;
 @group(0) @binding(4) var<uniform> view: View;
 @group(0) @binding(5) var<uniform> config: Config;
+
+#ifdef EDGE_DETECTION_MATERIAL
+@group(0) @binding(6) var deferred_prepass_texture: texture_2d<u32>;
+#endif
 
 /// Retrieve the perspective camera near clipping plane
 fn perspective_camera_near() -> f32 {
@@ -61,7 +67,7 @@ var<private> neighbours: array<vec2f, 9> = array<vec2f, 9>(
     vec2f(-1.0, -1.0), vec2f(0.0, -1.0), vec2f(1.0, -1.0),
 );
 
-var<private> thickness: f32 = 0.8;
+// var<private> thickness: f32 = 0.8;
 
 fn detect_edge_f32(samples: ptr<function, array<f32, 9>>) -> f32 {
     var horizontal = vec3f(0.0);
@@ -75,6 +81,7 @@ fn detect_edge_f32(samples: ptr<function, array<f32, 9>>) -> f32 {
     var edge = sqrt(dot(horizontal, horizontal) + dot(vertical, vertical));
     return edge;
 }
+
 
 fn detect_edge_vec3(samples: ptr<function, array<vec3f, 9>>) -> f32 {
     var horizontal = vec3f(0.0);
@@ -113,7 +120,7 @@ fn detect_edge_depth(frag_coord: vec2f) -> f32 {
 
     var samples = array<f32, 9>();
     for (var i = 0; i < 9; i++) {
-        samples[i] =  depth_ndc_to_view_z(prepass_depth(frag_coord + neighbours[i] * thickness));
+        samples[i] =  depth_ndc_to_view_z(prepass_depth(frag_coord + neighbours[i] * config.thickness));
     }
 
     let edge = detect_edge_f32(&samples);
@@ -140,7 +147,7 @@ fn detect_edge_normal(frag_coord: vec2f) -> f32 {
 
     var samples = array<vec3f, 9>();
     for (var i = 0; i < 9; i++) {
-        samples[i] = prepass_normal(frag_coord + neighbours[i] * thickness);
+        samples[i] = prepass_normal(frag_coord + neighbours[i] * config.thickness);
     }
 
     let edge = detect_edge_vec3(&samples);
@@ -157,7 +164,7 @@ fn detect_edge_color(frag_coord: vec2f) -> f32 {
 
     var samples = array<vec3f, 9>();
     for (var i = 0; i < 9; i++) {
-        samples[i] = textureLoad(screen_texture, vec2i(frag_coord + neighbours[i] * thickness), 0).rgb;
+        samples[i] = textureLoad(screen_texture, vec2i(frag_coord + neighbours[i] * config.thickness), 0).rgb;
     }
 
     let edge = detect_edge_vec3(&samples);
@@ -167,12 +174,37 @@ fn detect_edge_color(frag_coord: vec2f) -> f32 {
     return edge;
 }
 
+#ifdef EDGE_DETECTION_MATERIAL
+// checks nearby pixels for being part of the mask, this is to help give the thickness even on the pixels outside of the
+// selected entity
+fn detect_edge_mask(frag_coord: vec2f) -> bool {
+    for (var i = 0; i < 9; i++) {
+        let deferred = textureLoad(deferred_prepass_texture, vec2i(frag_coord + neighbours[i] * config.thickness), 0);
+        let should_edge: bool = ((deferred[0] & (1u << BIT_OFFSET)) != 0u);
+        if (should_edge) {
+            // pixel was within range of the coord
+            return true;
+        }
+    }
+    // no masked pixel was within range of the coord
+    return false;
+}
+#endif
+
+// this needs to be synced in the edge_detection_material.wgsl as well
+const BIT_OFFSET: u32 = 9u;
+
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let color = textureSample(screen_texture, texture_sampler, in.uv);
-
-    if config.enabled == 1u {
-        let frag_coord = in.position.xy;
+    
+    let frag_coord = in.position.xy;
+    
+    var should_draw_edge: bool = config.full_screen_enabled == 1u;
+#ifdef EDGE_DETECTION_MATERIAL
+    should_draw_edge = detect_edge_mask(frag_coord) || should_draw_edge;
+#endif
+    if should_draw_edge {
         let edge_depth = detect_edge_depth(frag_coord);
         let edge_normal = detect_edge_normal(frag_coord);
         let edge_color = detect_edge_color(frag_coord);
