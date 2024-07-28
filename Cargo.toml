@@ -9,4 +9,4 @@ repository = "https://github.com/IceSentry/bevy_mod_edge_detection"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.13"
+bevy = "0.14"

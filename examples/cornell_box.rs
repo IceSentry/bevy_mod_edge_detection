@@ -1,14 +1,10 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    core_pipeline::{
+    color::palettes, core_pipeline::{
         fxaa::{Fxaa, Sensitivity},
         prepass::{DepthPrepass, NormalPrepass},
-    },
-    diagnostic::{Diagnostic, DiagnosticsStore, FrameTimeDiagnosticsPlugin},
-    math::vec3,
-    prelude::*,
-    window::{PresentMode, WindowResolution},
+    }, diagnostic::{Diagnostic, DiagnosticsStore, FrameTimeDiagnosticsPlugin}, math::vec3, prelude::*, window::{PresentMode, WindowResolution}
 };
 use bevy_mod_edge_detection::{EdgeDetectionCamera, EdgeDetectionConfig, EdgeDetectionPlugin};
 
@@ -85,7 +81,7 @@ fn setup_ui(mut commands: Commands) {
                 ..default()
             }),
         )
-        .insert(BackgroundColor(Color::BLACK.with_a(0.75)));
+        .insert(BackgroundColor(Color::BLACK));
 }
 
 fn spawn_cornell_box(
@@ -122,7 +118,7 @@ fn spawn_cornell_box(
     // left
     commands.spawn(PbrBundle {
         mesh: plane.clone(),
-        material: materials.add(Color::RED),
+        material: materials.add(StandardMaterial{base_color: Color::from(palettes::css::DIM_GREY), ..default()}),
         transform: Transform::from_xyz(2.5, 2.5, 0.0)
             .with_rotation(Quat::from_rotation_z(FRAC_PI_2)),
         ..default()
@@ -130,7 +126,7 @@ fn spawn_cornell_box(
     // right
     commands.spawn(PbrBundle {
         mesh: plane,
-        material: materials.add(Color::GREEN),
+        material: materials.add(Color::from(palettes::css::GREEN)),
         transform: Transform::from_xyz(-2.5, 2.5, 0.0)
             .with_rotation(Quat::from_rotation_z(-FRAC_PI_2)),
         ..default()

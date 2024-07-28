@@ -39,7 +39,7 @@ impl Plugin for EdgeDetectionPlugin {
 
         app.add_plugins(ExtractComponentPlugin::<EdgeDetectionCamera>::default());
 
-        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
 
@@ -62,7 +62,7 @@ impl Plugin for EdgeDetectionPlugin {
             );
     }
     fn finish(&self, app: &mut App) {
-        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
         render_app
@@ -78,7 +78,7 @@ pub struct EdgeDetectionConfig {
     pub depth_threshold: f32,
     pub normal_threshold: f32,
     pub color_threshold: f32,
-    pub edge_color: Color,
+    pub edge_color: Vec4,
     pub debug: u32,
     pub enabled: u32,
 }
@@ -89,7 +89,7 @@ impl Default for EdgeDetectionConfig {
             depth_threshold: 0.2,
             normal_threshold: 0.05,
             color_threshold: 1.0,
-            edge_color: Color::BLACK,
+            edge_color: Color::BLACK.to_linear().to_vec4(),
             debug: 0,
             enabled: 1,
         }
