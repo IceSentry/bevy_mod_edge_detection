@@ -1,10 +1,9 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    core_pipeline::{
-        fxaa::{Fxaa, Sensitivity},
-        prepass::{DepthPrepass, NormalPrepass},
-    },
+    anti_aliasing::fxaa::{Fxaa, Sensitivity},
+    color::palettes::css::{GREEN, RED, WHITE},
+    core_pipeline::prepass::{DepthPrepass, NormalPrepass},
     diagnostic::{Diagnostic, DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     math::vec3,
     prelude::*,
@@ -14,7 +13,6 @@ use bevy_mod_edge_detection::{EdgeDetectionCamera, EdgeDetectionConfig, EdgeDete
 
 fn main() {
     App::new()
-        .insert_resource(Msaa::Off)
         .add_plugins((
             DefaultPlugins.set(WindowPlugin {
                 primary_window: Some(Window {
@@ -24,7 +22,7 @@ fn main() {
                 }),
                 ..default()
             }),
-            FrameTimeDiagnosticsPlugin,
+            FrameTimeDiagnosticsPlugin::default(),
             EdgeDetectionPlugin,
         ))
         .insert_resource(EdgeDetectionConfig {
@@ -48,13 +46,11 @@ fn main() {
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 2.5, -8.75)
-                .looking_at(vec3(0.0, 2.5, 0.0), Vec3::Y),
-            ..default()
-        },
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 2.5, -8.75).looking_at(vec3(0.0, 2.5, 0.0), Vec3::Y),
         DepthPrepass,
         NormalPrepass,
+        Msaa::Off,
         Fxaa {
             enabled: true,
             edge_threshold: Sensitivity::Extreme,
@@ -65,27 +61,22 @@ fn setup_camera(mut commands: Commands) {
 }
 
 fn setup_ui(mut commands: Commands) {
-    let style = TextStyle {
-        font_size: 16.0,
-        color: Color::WHITE,
-        ..default()
-    };
     commands
-        .spawn(
-            TextBundle::from_sections([
-                TextSection::from_style(style.clone()),
-                TextSection::new(" fps\n", style.clone()),
-                TextSection::from_style(style.clone()),
-                TextSection::new(" ms", style),
-            ])
-            .with_style(Style {
+        .spawn((
+            Text::new(" fps\n ms"),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            TextColor(WHITE.into()),
+            Node {
                 position_type: PositionType::Absolute,
                 top: Val::Px(5.0),
                 left: Val::Px(5.0),
                 ..default()
-            }),
-        )
-        .insert(BackgroundColor(Color::BLACK.with_a(0.75)));
+            },
+        ))
+        .insert(BackgroundColor(Color::BLACK.with_alpha(0.75)));
 }
 
 fn spawn_cornell_box(
@@ -98,55 +89,45 @@ fn spawn_cornell_box(
     let plane = meshes.add(Plane3d::default().mesh().size(plane_size, plane_size));
 
     // bottom
-    commands.spawn(PbrBundle {
-        mesh: plane.clone(),
-        material: white.clone(),
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        ..default()
-    });
+    commands.spawn((
+        Mesh3d(plane.clone()),
+        MeshMaterial3d(white.clone()),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+    ));
     // top
-    commands.spawn(PbrBundle {
-        mesh: plane.clone(),
-        material: white.clone(),
-        transform: Transform::from_xyz(0.0, 5.0, 0.0).with_rotation(Quat::from_rotation_x(PI)),
-        ..default()
-    });
+    commands.spawn((
+        Mesh3d(plane.clone()),
+        MeshMaterial3d(white.clone()),
+        Transform::from_xyz(0.0, 5.0, 0.0).with_rotation(Quat::from_rotation_x(PI)),
+    ));
     // back
-    commands.spawn(PbrBundle {
-        mesh: plane.clone(),
-        material: white,
-        transform: Transform::from_xyz(0.0, 2.5, 2.5)
-            .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
-        ..default()
-    });
+    commands.spawn((
+        Mesh3d(plane.clone()),
+        MeshMaterial3d(white),
+        Transform::from_xyz(0.0, 2.5, 2.5).with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
+    ));
     // left
-    commands.spawn(PbrBundle {
-        mesh: plane.clone(),
-        material: materials.add(Color::RED),
-        transform: Transform::from_xyz(2.5, 2.5, 0.0)
-            .with_rotation(Quat::from_rotation_z(FRAC_PI_2)),
-        ..default()
-    });
+    commands.spawn((
+        Mesh3d(plane.clone()),
+        MeshMaterial3d(materials.add(Color::Srgba(RED))),
+        Transform::from_xyz(2.5, 2.5, 0.0).with_rotation(Quat::from_rotation_z(FRAC_PI_2)),
+    ));
     // right
-    commands.spawn(PbrBundle {
-        mesh: plane,
-        material: materials.add(Color::GREEN),
-        transform: Transform::from_xyz(-2.5, 2.5, 0.0)
-            .with_rotation(Quat::from_rotation_z(-FRAC_PI_2)),
-        ..default()
-    });
+    commands.spawn((
+        Mesh3d(plane),
+        MeshMaterial3d(materials.add(Color::Srgba(GREEN))),
+        Transform::from_xyz(-2.5, 2.5, 0.0).with_rotation(Quat::from_rotation_z(-FRAC_PI_2)),
+    ));
 
     // Light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
+    commands.spawn((
+        PointLight {
             intensity: 1000.0,
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(0.0, 5.0 - 0.005, 0.0)
-            .with_rotation(Quat::from_rotation_x(PI)),
-        ..default()
-    });
+        Transform::from_xyz(0.0, 5.0 - 0.005, 0.0).with_rotation(Quat::from_rotation_x(PI)),
+    ));
 }
 
 fn spawn_boxes(
@@ -157,25 +138,23 @@ fn spawn_boxes(
     let box_size = 1.25;
     let half_box_size = box_size / 2.0;
 
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(box_size, box_size * 2.0, box_size)),
-        material: materials.add(Color::WHITE),
-        transform: Transform::from_xyz(half_box_size, half_box_size * 2.0, half_box_size)
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(box_size, box_size * 2.0, box_size))),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        Transform::from_xyz(half_box_size, half_box_size * 2.0, half_box_size)
             .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_6)),
-        ..default()
-    });
+    ));
 
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(box_size, box_size, box_size)),
-        material: materials.add(Color::WHITE),
-        transform: Transform::from_xyz(-half_box_size, half_box_size, -half_box_size)
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(box_size, box_size, box_size))),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        Transform::from_xyz(-half_box_size, half_box_size, -half_box_size)
             .with_rotation(Quat::from_rotation_y(-std::f32::consts::FRAC_PI_6)),
-        ..default()
-    });
+    ));
 }
 
 fn set_unlit(
-    material_handles: Query<&Handle<StandardMaterial>>,
+    material_handles: Query<&MeshMaterial3d<StandardMaterial>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for id in &material_handles {
@@ -187,19 +166,25 @@ fn set_unlit(
 
 fn update_diagnostic_display(diagnostics: Res<DiagnosticsStore>, mut query: Query<&mut Text>) {
     for mut text in &mut query {
-        if let Some(fps_smoothed) = diagnostics
+        let fps_smoothed = if let Some(fps) = diagnostics
             .get(&FrameTimeDiagnosticsPlugin::FPS)
             .and_then(Diagnostic::smoothed)
         {
-            text.sections[0].value = format!("{fps_smoothed:.1}");
-        }
+            fps
+        } else {
+            0.0
+        };
 
-        if let Some(frame_time_smoothed) = diagnostics
+        let frame_time_smoothed = if let Some(frame) = diagnostics
             .get(&FrameTimeDiagnosticsPlugin::FRAME_TIME)
             .and_then(Diagnostic::smoothed)
         {
-            text.sections[2].value = format!("{frame_time_smoothed:.3}");
-        }
+            frame
+        } else {
+            0.0
+        };
+
+        text.0 = format!("{fps_smoothed:.0} fps\n{frame_time_smoothed:.1} ms");
     }
 }
 
@@ -222,22 +207,22 @@ fn update_camera(
     let speed = 10.0;
     for mut t in &mut cam {
         if key_input.pressed(KeyCode::KeyS) {
-            t.translation.z -= speed * time.delta_seconds();
+            t.translation.z -= speed * time.delta_secs();
         }
         if key_input.pressed(KeyCode::KeyW) {
-            t.translation.z += speed * time.delta_seconds();
+            t.translation.z += speed * time.delta_secs();
         }
         if key_input.pressed(KeyCode::KeyD) {
-            t.translation.x -= speed * time.delta_seconds();
+            t.translation.x -= speed * time.delta_secs();
         }
         if key_input.pressed(KeyCode::KeyA) {
-            t.translation.x += speed * time.delta_seconds();
+            t.translation.x += speed * time.delta_secs();
         }
         if key_input.pressed(KeyCode::KeyQ) {
-            t.translation.y -= speed * time.delta_seconds();
+            t.translation.y -= speed * time.delta_secs();
         }
         if key_input.pressed(KeyCode::KeyE) {
-            t.translation.y += speed * time.delta_seconds();
+            t.translation.y += speed * time.delta_secs();
         }
     }
 }

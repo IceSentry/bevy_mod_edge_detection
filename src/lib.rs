@@ -1,26 +1,25 @@
 use bevy::{
-    asset::load_internal_asset,
+    asset::{load_internal_asset, uuid_handle},
     core_pipeline::{
+        FullscreenShader,
         core_3d::graph::{Core3d, Node3d},
-        fullscreen_vertex_shader::fullscreen_shader_vertex_state,
     },
     prelude::*,
     render::{
+        Extract, Render, RenderApp, RenderSystems,
         extract_component::{ExtractComponent, ExtractComponentPlugin},
-        render_graph::{RenderGraphApp, ViewNodeRunner},
+        render_graph::{RenderGraphExt as _, ViewNodeRunner},
         render_resource::{
-            binding_types::{
-                sampler, texture_2d, texture_depth_2d, uniform_buffer, uniform_buffer_sized,
-            },
             BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
             ColorWrites, FragmentState, MultisampleState, PipelineCache, PrimitiveState,
             RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             ShaderType, TextureFormat, TextureSampleType, UniformBuffer,
+            binding_types::{
+                sampler, texture_2d, texture_depth_2d, uniform_buffer, uniform_buffer_sized,
+            },
         },
         renderer::{RenderDevice, RenderQueue},
-        texture::BevyDefault,
         view::ViewUniform,
-        Extract, Render, RenderApp, RenderSet,
     },
 };
 use node::EdgeDetectionNode;
@@ -29,7 +28,7 @@ use crate::node::EdgeDetetctionNodeLabel;
 
 mod node;
 
-pub const SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(410592619790336);
+pub const SHADER_HANDLE: Handle<Shader> = uuid_handle!("18fa3c17-aa13-4ddf-908d-6289dba25864");
 
 pub struct EdgeDetectionPlugin;
 impl Plugin for EdgeDetectionPlugin {
@@ -39,13 +38,13 @@ impl Plugin for EdgeDetectionPlugin {
 
         app.add_plugins(ExtractComponentPlugin::<EdgeDetectionCamera>::default());
 
-        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
 
         render_app
             .add_systems(ExtractSchedule, extract_config)
-            .add_systems(Render, prepare_config_buffer.in_set(RenderSet::Prepare));
+            .add_systems(Render, prepare_config_buffer.in_set(RenderSystems::Prepare));
 
         render_app
             .add_render_graph_node::<ViewNodeRunner<EdgeDetectionNode>>(
@@ -62,7 +61,7 @@ impl Plugin for EdgeDetectionPlugin {
             );
     }
     fn finish(&self, app: &mut App) {
-        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
         render_app
@@ -78,7 +77,7 @@ pub struct EdgeDetectionConfig {
     pub depth_threshold: f32,
     pub normal_threshold: f32,
     pub color_threshold: f32,
-    pub edge_color: Color,
+    pub edge_color: LinearRgba,
     pub debug: u32,
     pub enabled: u32,
 }
@@ -89,7 +88,12 @@ impl Default for EdgeDetectionConfig {
             depth_threshold: 0.2,
             normal_threshold: 0.05,
             color_threshold: 1.0,
-            edge_color: Color::BLACK,
+            edge_color: LinearRgba {
+                red: 0.0,
+                green: 0.0,
+                blue: 0.0,
+                alpha: 1.0,
+            },
             debug: 0,
             enabled: 1,
         }
@@ -164,6 +168,10 @@ impl FromWorld for EdgeDetectionPipeline {
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        let vertex = world
+            .get_resource::<FullscreenShader>()
+            .map(|f| f.to_vertex_state())
+            .expect("fullscreen shader");
 
         let pipeline_id =
             world
@@ -172,11 +180,11 @@ impl FromWorld for EdgeDetectionPipeline {
                     label: Some("edge_detection_pipeline".into()),
                     layout: vec![layout.clone()],
                     // This will setup a fullscreen triangle for the vertex state
-                    vertex: fullscreen_shader_vertex_state(),
+                    vertex,
                     fragment: Some(FragmentState {
                         shader: SHADER_HANDLE,
                         shader_defs: vec!["VIEW_PROJECTION_PERSPECTIVE".into()], // TODO detect projection
-                        entry_point: "fragment".into(),
+                        entry_point: Some("fragment".into()),
                         targets: vec![Some(ColorTargetState {
                             format: TextureFormat::bevy_default(),
                             blend: None,
@@ -187,6 +195,7 @@ impl FromWorld for EdgeDetectionPipeline {
                     depth_stencil: None,
                     multisample: MultisampleState::default(),
                     push_constant_ranges: vec![],
+                    zero_initialize_workgroup_memory: true,
                 });
 
         Self {

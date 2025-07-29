@@ -19,7 +19,7 @@ struct Config {
 
 /// Retrieve the perspective camera near clipping plane
 fn perspective_camera_near() -> f32 {
-    return view.projection[3][2];
+    return view.clip_from_view[3][2];
 }
 
 /// Convert ndc depth to linear view z.
@@ -30,7 +30,7 @@ fn depth_ndc_to_view_z(ndc_depth: f32) -> f32 {
 #else ifdef VIEW_PROJECTION_ORTHOGRAPHIC
     return -(view.projection[3][2] - ndc_depth) / view.projection[2][2];
 #else
-    let view_pos = view.inverse_projection * vec4(0.0, 0.0, ndc_depth, 1.0);
+    let view_pos = view.view_from_clip * vec4(0.0, 0.0, ndc_depth, 1.0);
     return view_pos.z / view_pos.w;
 #endif
 }
@@ -102,7 +102,7 @@ fn uv_to_ndc(uv: vec2<f32>) -> vec2<f32> {
 
 /// Convert a ndc space position to view space
 fn position_ndc_to_view(ndc_pos: vec3<f32>) -> vec3<f32> {
-    let view_pos = view.inverse_projection * vec4(ndc_pos, 1.0);
+    let view_pos = view.view_from_clip * vec4(ndc_pos, 1.0);
     return view_pos.xyz / view_pos.w;
 }
 
